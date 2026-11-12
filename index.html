@@ -78,7 +78,7 @@
         <div class="flex items-center gap-2">
             <div id="ws-badge" class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs">
                 <span id="ws-dot" class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
-                <span id="ws-status-text" class="text-zinc-300">Łączenie z TikFinity...</span>
+                <span id="ws-status-text" class="text-zinc-300">WebSocket: Oczekiwanie (ws://localhost:21213)</span>
             </div>
             <button id="toggle-streamer-btn" onclick="toggleStreamerMode()" class="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs md:text-sm transition shadow-lg shadow-emerald-900/40 flex items-center gap-2 cursor-pointer">
                 <span>🎥</span> <span id="streamer-btn-text">Tryb Streamera (Ukryj panele)</span>
@@ -257,7 +257,7 @@
             </div>
         </div>
 
-        <!-- PRAWY PANEL: Status WebSocket -->
+        <!-- PRAWY PANEL: Instrukcja TikFinity -->
         <div class="side-panel w-full lg:w-80 bg-zinc-900/90 border border-zinc-800 rounded-2xl p-4 flex flex-col gap-3.5 shadow-xl text-xs">
             <div class="border-b border-zinc-800 pb-2">
                 <h2 class="text-sm font-bold uppercase tracking-wider text-zinc-400">📡 Połączenie z TikFinity</h2>
@@ -265,9 +265,336 @@
 
             <div class="space-y-2.5 text-zinc-300 leading-relaxed">
                 <div class="bg-zinc-950/70 p-2.5 rounded-xl border border-zinc-800">
-                    <span class="font-bold text-emerald-400 block mb-0.5">TikFinity (Port 21213)</span>
-                    Aplikacja wysyła eventy bezpośrednio tutaj. Klikaj przyciski po lewej, aby testować wizualia.
+                    <span class="font-bold text-emerald-400 block mb-0.5">Port 21213</span>
+                    Uruchom TikFinity na komputerze. Gra automatycznie połączy się z Twoim programem.
                 </div>
             </div>
 
-            <button onclick="connectWebSocket()" class="w-full py-2 rounded-xl bg-sky-600/20 hover:bg-sky-600/30 border border-sky-500/40 text-sky-30
+            <button onclick="connectWebSocket()" class="w-full py-2 rounded-xl bg-sky-600/20 hover:bg-sky-600/30 border border-sky-500/40 text-sky-300 font-semibold transition cursor-pointer">
+                🔌 Połącz ponownie
+            </button>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * ============================================================================
+         * 1. STAN GRY I KONFIGURACJA
+         * ============================================================================
+         */
+        const GAME_CONFIG = {
+            roundDuration: 60,
+            winThreshold: 100,
+            trackLength: 7.0,
+            autoRestartDelay: 5
+        };
+
+        let state = {
+            round: 1,
+            timeLeft: GAME_CONFIG.roundDuration,
+            roseScore: 0,
+            galaxyScore: 0,
+            roseWins: 0,
+            galaxyWins: 0,
+            isRoundOver: false,
+            autoBattle: false,
+            autoIntervalMs: 1200,
+            donors: {},
+            targetCoreZ: 0,
+            currentCoreZ: 0,
+            cameraShake: 0
+        };
+
+        const FAKE_USERS = [
+            "Kasia_PL", "MatiGaming", "Ola_Warszawa", "Szefu99", "ZuziaX",
+            "Kamil_Live", "NocnyMarek", "Ania_2004", "Bartek_PRO", "KrólowaTikToka"
+        ];
+
+        /**
+         * ============================================================================
+         * 2. INICJALIZACJA SCENY 3D (THREE.JS)
+         * ============================================================================
+         */
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x090912, 0.035);
+
+        const camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 0.1, 100);
+        const baseCameraPos = new THREE.Vector3(0, 11.5, 13.5);
+        camera.position.copy(baseCameraPos);
+        camera.lookAt(0, 0.5, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        container.appendChild(renderer.domElement);
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
+        dirLight.position.set(6, 15, 8);
+        dirLight.castShadow = true;
+        scene.add(dirLight);
+
+        const roseLight = new THREE.PointLight(0xf43f5e, 2.5, 18);
+        roseLight.position.set(0, 3, -GAME_CONFIG.trackLength);
+        scene.add(roseLight);
+
+        const galaxyLight = new THREE.PointLight(0x3b82f6, 2.5, 18);
+        galaxyLight.position.set(0, 3, GAME_CONFIG.trackLength);
+        scene.add(galaxyLight);
+
+        const floorGeo = new THREE.PlaneGeometry(16, 24);
+        const floorMat = new THREE.MeshStandardMaterial({
+            color: 0x11111b,
+            roughness: 0.4,
+            metalness: 0.6
+        });
+        const floor = new THREE.Mesh(floorGeo, floorMat);
+        floor.rotation.x = -Math.PI / 2;
+        floor.receiveShadow = true;
+        scene.add(floor);
+
+        const gridHelper = new THREE.GridHelper(22, 22, 0x3f3f46, 0x1e1e2e);
+        gridHelper.position.y = 0.01;
+        scene.add(gridHelper);
+
+        const centerLineGeo = new THREE.BoxGeometry(10, 0.05, 0.15);
+        const centerLineMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        const centerLine = new THREE.Mesh(centerLineGeo, centerLineMat);
+        centerLine.position.y = 0.03;
+        scene.add(centerLine);
+
+        const trackGeo = new THREE.BoxGeometry(0.4, 0.08, GAME_CONFIG.trackLength * 2);
+        const trackMat = new THREE.MeshStandardMaterial({
+            color: 0x27272a,
+            emissive: 0x18181b,
+            metalness: 0.8
+        });
+        const track = new THREE.Mesh(trackGeo, trackMat);
+        track.position.y = 0.04;
+        scene.add(track);
+
+        function createTeamTotem(colorHex, zPos) {
+            const group = new THREE.Group();
+            group.position.set(0, 0, zPos);
+
+            const baseGeo = new THREE.CylinderGeometry(1.6, 2.0, 0.6, 16);
+            const baseMat = new THREE.MeshStandardMaterial({ color: 0x1f1f2e, metalness: 0.7, roughness: 0.3 });
+            const base = new THREE.Mesh(baseGeo, baseMat);
+            base.position.y = 0.3;
+            group.add(base);
+
+            const crystalGeo = new THREE.OctahedronGeometry(1.1, 0);
+            const crystalMat = new THREE.MeshStandardMaterial({
+                color: colorHex,
+                emissive: colorHex,
+                emissiveIntensity: 0.6,
+                roughness: 0.2,
+                metalness: 0.5
+            });
+            const crystal = new THREE.Mesh(crystalGeo, crystalMat);
+            crystal.position.y = 2.0;
+            group.add(crystal);
+
+            const ringGeo = new THREE.TorusGeometry(1.5, 0.08, 12, 32);
+            const ringMat = new THREE.MeshBasicMaterial({ color: colorHex });
+            const ring = new THREE.Mesh(ringGeo, ringMat);
+            ring.position.y = 2.0;
+            ring.rotation.x = Math.PI / 2;
+            group.add(ring);
+
+            scene.add(group);
+            return { group, crystal, ring };
+        }
+
+        const roseTotem = createTeamTotem(0xf43f5e, -GAME_CONFIG.trackLength);
+        const galaxyTotem = createTeamTotem(0x3b82f6, GAME_CONFIG.trackLength);
+
+        const coreGroup = new THREE.Group();
+        coreGroup.position.set(0, 1.5, 0);
+
+        const coreGeo = new THREE.IcosahedronGeometry(1.15, 1);
+        const coreMat = new THREE.MeshStandardMaterial({
+            color: 0xffffff,
+            emissive: 0xa855f7,
+            emissiveIntensity: 0.8,
+            roughness: 0.1,
+            metalness: 0.9
+        });
+        const coreMesh = new THREE.Mesh(coreGeo, coreMat);
+        coreGroup.add(coreMesh);
+
+        const cageGeo = new THREE.IcosahedronGeometry(1.45, 0);
+        const cageMat = new THREE.MeshBasicMaterial({ color: 0xfef08a, wireframe: true });
+        const cageMesh = new THREE.Mesh(cageGeo, cageMat);
+        coreGroup.add(cageMesh);
+
+        const coreLight = new THREE.PointLight(0xd8b4fe, 3, 12);
+        coreGroup.add(coreLight);
+        scene.add(coreGroup);
+
+        function createBeam(colorHex) {
+            const geo = new THREE.CylinderGeometry(0.14, 0.14, 1, 12);
+            geo.rotateX(Math.PI / 2);
+            const mat = new THREE.MeshBasicMaterial({ color: colorHex, transparent: true, opacity: 0.85 });
+            const mesh = new THREE.Mesh(geo, mat);
+            scene.add(mesh);
+            return mesh;
+        }
+
+        const roseBeam = createBeam(0xf43f5e);
+        const galaxyBeam = createBeam(0x3b82f6);
+
+        const particles = [];
+
+        function spawnBurst3D(colorHex, zPos, count = 25, isConfetti = false) {
+            const geo = isConfetti ? new THREE.PlaneGeometry(0.25, 0.15) : new THREE.BoxGeometry(0.22, 0.22, 0.22);
+
+            for (let i = 0; i < count; i++) {
+                const mat = new THREE.MeshBasicMaterial({
+                    color: isConfetti ? Math.random() * 0xffffff : colorHex,
+                    side: THREE.DoubleSide
+                });
+                const mesh = new THREE.Mesh(geo, mat);
+
+                mesh.position.set(
+                    (Math.random() - 0.5) * (isConfetti ? 8 : 1.5),
+                    isConfetti ? 8 + Math.random() * 5 : 1.5 + Math.random(),
+                    zPos + (Math.random() - 0.5) * (isConfetti ? 12 : 1.5)
+                );
+
+                const velocity = new THREE.Vector3(
+                    (Math.random() - 0.5) * (isConfetti ? 0.15 : 0.35),
+                    isConfetti ? -0.08 - Math.random() * 0.1 : 0.15 + Math.random() * 0.25,
+                    (Math.random() - 0.5) * (isConfetti ? 0.15 : 0.35)
+                );
+
+                scene.add(mesh);
+                particles.push({ mesh, velocity, life: isConfetti ? 180 : 55, isConfetti });
+            }
+        }
+
+        /**
+         * ============================================================================
+         * 3. LOGIKA ROZGRYWKI I OBSŁUGA PREZENTÓW
+         * ============================================================================
+         */
+        function triggerGift(team, giftName, icon, points, customUser = null) {
+            if (state.isRoundOver) return;
+
+            const user = customUser || FAKE_USERS[Math.floor(Math.random() * FAKE_USERS.length)];
+
+            if (team === 'rose') {
+                state.roseScore += points;
+            } else {
+                state.galaxyScore += points;
+            }
+
+            state.donors[user] = (state.donors[user] || 0) + points;
+            updateMVP();
+
+            const diff = state.galaxyScore - state.roseScore;
+            const normalized = Math.max(-1, Math.min(1, diff / GAME_CONFIG.winThreshold));
+            state.targetCoreZ = normalized * (GAME_CONFIG.trackLength - 1.4);
+
+            state.cameraShake = Math.min(0.6, 0.12 + points * 0.012);
+            const burstColor = team === 'rose' ? 0xf43f5e : 0x3b82f6;
+            const burstCount = Math.min(60, 12 + points * 2);
+            spawnBurst3D(burstColor, state.currentCoreZ, burstCount, false);
+
+            coreGroup.scale.set(1.35, 1.35, 1.35);
+
+            showGiftToast(user, giftName, icon, points, team);
+            updateHUD();
+
+            if (Math.abs(diff) >= GAME_CONFIG.winThreshold) {
+                endRound(diff < 0 ? 'rose' : 'galaxy');
+            }
+        }
+
+        function showGiftToast(user, giftName, icon, points, team) {
+            const container = document.getElementById('gift-notifications');
+            const toast = document.createElement('div');
+
+            const borderColor = team === 'rose' ? 'border-rose-500/70 bg-rose-950/85' : 'border-blue-500/70 bg-blue-950/85';
+            const badgeColor = team === 'rose' ? 'text-rose-300' : 'text-blue-300';
+
+            toast.className = `gift-toast mb-2 px-4 py-2 rounded-2xl border ${borderColor} backdrop-blur-md shadow-xl flex items-center gap-3 max-w-[90%]`;
+            toast.innerHTML = `
+                <span class="text-3xl">${icon}</span>
+                <div class="text-left leading-tight">
+                    <div class="text-xs font-black text-white">@${user}</div>
+                    <div class="text-[11px] ${badgeColor} font-semibold">wysłał(a) ${giftName} <span class="text-amber-300 font-bold">(+${points} pkt)</span></div>
+                </div>
+            `;
+
+            container.appendChild(toast);
+            if (container.children.length > 3) {
+                container.removeChild(container.firstChild);
+            }
+
+            setTimeout(() => {
+                if (toast.parentNode === container) {
+                    container.removeChild(toast);
+                }
+            }, 2400);
+        }
+
+        function updateMVP() {
+            let topUser = null;
+            let topPoints = 0;
+            for (const [user, pts] of Object.entries(state.donors)) {
+                if (pts > topPoints) {
+                    topPoints = pts;
+                    topUser = user;
+                }
+            }
+            const mvpEl = document.getElementById('mvp-display');
+            if (topUser) {
+                mvpEl.textContent = `@${topUser} (${topPoints} pkt)`;
+            } else {
+                mvpEl.textContent = "Czekam na prezenty...";
+            }
+        }
+
+        function updateHUD() {
+            document.getElementById('rose-score').textContent = state.roseScore;
+            document.getElementById('galaxy-score').textContent = state.galaxyScore;
+            document.getElementById('rose-wins').textContent = state.roseWins;
+            document.getElementById('galaxy-wins').textContent = state.galaxyWins;
+            document.getElementById('round-number').textContent = state.round;
+
+            const total = state.roseScore + state.galaxyScore;
+            let rosePercent = 50;
+            let galaxyPercent = 50;
+
+            if (total > 0) {
+                rosePercent = (state.roseScore / total) * 100;
+                galaxyPercent = (state.galaxyScore / total) * 100;
+            }
+
+            document.getElementById('bar-rose').style.width = `${rosePercent}%`;
+            document.getElementById('bar-galaxy').style.width = `${galaxyPercent}%`;
+        }
+
+        function endRound(winningTeam) {
+            if (state.isRoundOver) return;
+            state.isRoundOver = true;
+
+            if (winningTeam === 'rose') {
+                state.roseWins++;
+                document.getElementById('winner-title').textContent = "WYGRYWA DRUŻYNA RÓŻA! 🌹";
+                document.getElementById('winner-icon').textContent = "🌹";
+                spawnBurst3D(0xf43f5e, 0, 120, true);
+            } else {
+                state.galaxyWins++;
+                document.getElementById('winner-title').textContent = "WYGRYWA DRUŻYNA GALAKTYKA! 🌌";
+                document.getElementById('winner-icon').textContent = "🌌";
+                spawnBurst3D(0x3b82f6, 0, 120, true);
+            }
+
+            let topUser = "Brak";
+            let
