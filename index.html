@@ -4,597 +4,227 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TikTok Live 3D - Bitwa o Arenę</title>
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Three.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <!-- Google Fonts: Inter & Orbitron -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #09090b;
-            color: #ffffff;
-            overflow-x: hidden;
-            user-select: none;
-        }
-        .font-gaming {
-            font-family: 'Orbitron', sans-serif;
-        }
-        /* Kontener formatu 9:16 dla TikTok Live Studio */
-        #tiktok-frame {
-            aspect-ratio: 9 / 16;
-            height: 88vh;
-            max-height: 860px;
-            min-height: 540px;
-            box-shadow: 0 0 50px rgba(236, 72, 153, 0.25), 0 0 80px rgba(59, 130, 246, 0.2);
-            border: 2px solid rgba(255, 255, 255, 0.15);
-            position: relative;
-            overflow: hidden;
-            background: radial-gradient(circle at center, #181824 0%, #09090f 100%);
-        }
-        /* Tryb Streamera: czysty ekran na środku */
-        body.streamer-mode {
-            background-color: #000000;
-        }
-        body.streamer-mode .side-panel {
-            display: none !important;
-        }
-        body.streamer-mode #tiktok-frame {
-            height: 98vh;
-            max-height: none;
-            border: none;
-            box-shadow: none;
-        }
-        /* Animacja wyskakującego prezentu */
-        @keyframes popGift {
-            0% { transform: scale(0.3) translateY(30px); opacity: 0; }
-            20% { transform: scale(1.1) translateY(0); opacity: 1; }
-            80% { transform: scale(1) translateY(-10px); opacity: 1; }
-            100% { transform: scale(0.8) translateY(-40px); opacity: 0; }
-        }
-        .gift-toast {
-            animation: popGift 2.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-        }
-        /* Pasek postępu przeciągania */
-        .tug-bar-glow-rose {
-            box-shadow: 0 0 20px #f43f5e, inset 0 0 10px #fda4af;
-        }
-        .tug-bar-glow-galaxy {
-            box-shadow: 0 0 20px #3b82f6, inset 0 0 10px #93c5fd;
-        }
+        body { font-family: 'Inter', sans-serif; background-color: #09090b; color: #ffffff; overflow-x: hidden; user-select: none; }
+        .font-gaming { font-family: 'Orbitron', sans-serif; }
+        #tiktok-frame { aspect-ratio: 9 / 16; height: 88vh; max-height: 860px; min-height: 540px; box-shadow: 0 0 50px rgba(236, 72, 153, 0.25), 0 0 80px rgba(59, 130, 246, 0.2); border: 2px solid rgba(255, 255, 255, 0.15); position: relative; overflow: hidden; background: radial-gradient(circle at center, #181824 0%, #09090f 100%); }
+        body.streamer-mode { background-color: #000000; }
+        body.streamer-mode .side-panel { display: none !important; }
+        body.streamer-mode #tiktok-frame { height: 98vh; max-height: none; border: none; box-shadow: none; }
+        @keyframes popGift { 0% { transform: scale(0.3) translateY(30px); opacity: 0; } 20% { transform: scale(1.1) translateY(0); opacity: 1; } 80% { transform: scale(1) translateY(-10px); opacity: 1; } 100% { transform: scale(0.8) translateY(-40px); opacity: 0; } }
+        .gift-toast { animation: popGift 2.4s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+        .tug-bar-glow-rose { box-shadow: 0 0 20px #f43f5e, inset 0 0 10px #fda4af; }
+        .tug-bar-glow-galaxy { box-shadow: 0 0 20px #3b82f6, inset 0 0 10px #93c5fd; }
     </style>
 </head>
 <body class="min-h-screen flex flex-col items-center justify-center p-2 md:p-4">
-
-    <!-- Pasek górny z przyciskiem Trybu Streamera -->
     <div id="top-bar" class="w-full max-w-7xl flex flex-wrap items-center justify-between gap-2 mb-3 px-2">
         <div class="flex items-center gap-3">
-            <span class="px-3 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-rose-500 to-blue-600 uppercase tracking-wider">
-                TikTok Live 3D Engine
-            </span>
+            <span class="px-3 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-rose-500 to-blue-600 uppercase tracking-wider">TikTok Live 3D Engine</span>
             <h1 class="text-lg md:text-xl font-bold text-zinc-100 hidden sm:block">Bitwa o Arenę: Róża vs Galaktyka</h1>
         </div>
         <div class="flex items-center gap-2">
             <div id="ws-badge" class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs">
                 <span id="ws-dot" class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
-                <span id="ws-status-text" class="text-zinc-300">WebSocket: Oczekiwanie (ws://localhost:21213)</span>
+                <span id="ws-status-text" class="text-zinc-300">Łączenie z TikFinity...</span>
             </div>
-            <button id="toggle-streamer-btn" onclick="toggleStreamerMode()" class="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs md:text-sm transition shadow-lg shadow-emerald-900/40 flex items-center gap-2 cursor-pointer">
-                <span>🎥</span> <span id="streamer-btn-text">Tryb Streamera (Ukryj panele)</span>
+            <button id="toggle-streamer-btn" onclick="toggleStreamerMode()" class="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition cursor-pointer">
+                <span>🎥</span> <span id="streamer-btn-text">Tryb Streamera</span>
             </button>
         </div>
     </div>
 
-    <!-- Główny układ: Lewy panel | Ekran 9:16 | Prawy panel -->
     <div class="w-full max-w-7xl flex flex-col lg:flex-row items-center justify-center gap-4 lg:gap-6">
-
-        <!-- LEWY PANEL: Symulator Prezentów TikToka -->
         <div class="side-panel w-full lg:w-80 bg-zinc-900/90 border border-zinc-800 rounded-2xl p-4 flex flex-col gap-4 shadow-xl">
             <div class="border-b border-zinc-800 pb-2">
                 <h2 class="text-sm font-bold uppercase tracking-wider text-zinc-400">🎮 Symulator Prezentów Live</h2>
-                <p class="text-xs text-zinc-500 mt-0.5">Kliknij prezent, aby przetestować efekt 3D na arenie</p>
+                <p class="text-xs text-zinc-500 mt-0.5">Kliknij prezent, aby przetestować efekt 3D</p>
             </div>
-
-            <!-- Drużyna Róża -->
             <div>
-                <div class="flex items-center justify-between mb-2">
-                    <span class="text-xs font-extrabold uppercase text-rose-400">🌹 Drużyna Róża (Góra)</span>
-                    <span class="text-[11px] text-zinc-500">Czerwoni</span>
-                </div>
+                <span class="text-xs font-extrabold uppercase text-rose-400 mb-2 block">🌹 Drużyna Róża</span>
                 <div class="grid grid-cols-3 gap-2">
-                    <button onclick="triggerGift('rose', 'Róża', '🌹', 1)" class="p-2 rounded-xl bg-rose-950/50 hover:bg-rose-900/70 border border-rose-500/30 flex flex-col items-center transition active:scale-95 cursor-pointer">
-                        <span class="text-2xl">🌹</span>
-                        <span class="text-[11px] font-bold mt-1">Róża</span>
-                        <span class="text-[10px] text-amber-400 font-semibold">+1 pkt</span>
-                    </button>
-                    <button onclick="triggerGift('rose', 'Serce GG', '🫶', 5)" class="p-2 rounded-xl bg-rose-950/50 hover:bg-rose-900/70 border border-rose-500/30 flex flex-col items-center transition active:scale-95 cursor-pointer">
-                        <span class="text-2xl">🫶</span>
-                        <span class="text-[11px] font-bold mt-1">Serce GG</span>
-                        <span class="text-[10px] text-amber-400 font-semibold">+5 pkt</span>
-                    </button>
-                    <button onclick="triggerGift('rose', 'Lody', '🍦', 15)" class="p-2 rounded-xl bg-rose-950/50 hover:bg-rose-900/70 border border-rose-500/30 flex flex-col items-center transition active:scale-95 cursor-pointer">
-                        <span class="text-2xl">🍦</span>
-                        <span class="text-[11px] font-bold mt-1">Lody</span>
-                        <span class="text-[10px] text-amber-400 font-semibold">+15 pkt</span>
-                    </button>
+                    <button onclick="triggerGift('rose', 'Róża', '🌹', 1)" class="p-2 rounded-xl bg-rose-950/50 hover:bg-rose-900 border border-rose-500/30 flex flex-col items-center cursor-pointer"><span class="text-2xl">🌹</span><span class="text-[11px] font-bold mt-1">Róża</span><span class="text-[10px] text-amber-400">+1 pkt</span></button>
+                    <button onclick="triggerGift('rose', 'Serce GG', '🫶', 5)" class="p-2 rounded-xl bg-rose-950/50 hover:bg-rose-900 border border-rose-500/30 flex flex-col items-center cursor-pointer"><span class="text-2xl">🫶</span><span class="text-[11px] font-bold mt-1">Serce</span><span class="text-[10px] text-amber-400">+5 pkt</span></button>
+                    <button onclick="triggerGift('rose', 'Lody', '🍦', 15)" class="p-2 rounded-xl bg-rose-950/50 hover:bg-rose-900 border border-rose-500/30 flex flex-col items-center cursor-pointer"><span class="text-2xl">🍦</span><span class="text-[11px] font-bold mt-1">Lody</span><span class="text-[10px] text-amber-400">+15 pkt</span></button>
                 </div>
             </div>
-
-            <!-- Drużyna Galaktyka -->
             <div>
-                <div class="flex items-center justify-between mb-2">
-                    <span class="text-xs font-extrabold uppercase text-blue-400">🌌 Drużyna Galaktyka (Dół)</span>
-                    <span class="text-[11px] text-zinc-500">Niebiescy</span>
-                </div>
+                <span class="text-xs font-extrabold uppercase text-blue-400 mb-2 block">🌌 Drużyna Galaktyka</span>
                 <div class="grid grid-cols-3 gap-2">
-                    <button onclick="triggerGift('galaxy', 'Corgi', '🐶', 1)" class="p-2 rounded-xl bg-blue-950/50 hover:bg-blue-900/70 border border-blue-500/30 flex flex-col items-center transition active:scale-95 cursor-pointer">
-                        <span class="text-2xl">🐶</span>
-                        <span class="text-[11px] font-bold mt-1">Corgi</span>
-                        <span class="text-[10px] text-amber-400 font-semibold">+1 pkt</span>
-                    </button>
-                    <button onclick="triggerGift('galaxy', 'Mikrofon', '🎤', 5)" class="p-2 rounded-xl bg-blue-950/50 hover:bg-blue-900/70 border border-blue-500/30 flex flex-col items-center transition active:scale-95 cursor-pointer">
-                        <span class="text-2xl">🎤</span>
-                        <span class="text-[11px] font-bold mt-1">Mikrofon</span>
-                        <span class="text-[10px] text-amber-400 font-semibold">+5 pkt</span>
-                    </button>
-                    <button onclick="triggerGift('galaxy', 'TikTok Universe', '🪐', 50)" class="p-2 rounded-xl bg-gradient-to-b from-indigo-900/80 to-purple-900/80 hover:from-indigo-800 hover:to-purple-800 border border-purple-400/50 flex flex-col items-center transition active:scale-95 cursor-pointer shadow-md shadow-purple-900/30">
-                        <span class="text-2xl">🪐</span>
-                        <span class="text-[10px] font-bold mt-1 text-center leading-tight">Universe</span>
-                        <span class="text-[10px] text-amber-300 font-bold">+50 pkt</span>
-                    </button>
+                    <button onclick="triggerGift('galaxy', 'Corgi', '🐶', 1)" class="p-2 rounded-xl bg-blue-950/50 hover:bg-blue-900 border border-blue-500/30 flex flex-col items-center cursor-pointer"><span class="text-2xl">🐶</span><span class="text-[11px] font-bold mt-1">Corgi</span><span class="text-[10px] text-amber-400">+1 pkt</span></button>
+                    <button onclick="triggerGift('galaxy', 'Mikrofon', '🎤', 5)" class="p-2 rounded-xl bg-blue-950/50 hover:bg-blue-900 border border-blue-500/30 flex flex-col items-center cursor-pointer"><span class="text-2xl">🎤</span><span class="text-[11px] font-bold mt-1">Mikrofon</span><span class="text-[10px] text-amber-400">+5 pkt</span></button>
+                    <button onclick="triggerGift('galaxy', 'Universe', '🪐', 50)" class="p-2 rounded-xl bg-purple-950/80 hover:bg-purple-900 border border-purple-400/50 flex flex-col items-center cursor-pointer"><span class="text-2xl">🪐</span><span class="text-[10px] font-bold mt-1">Universe</span><span class="text-[10px] text-amber-300">+50 pkt</span></button>
                 </div>
             </div>
-
-            <!-- Auto-Bitwa i Suwak Tempa -->
-            <div class="bg-zinc-950/80 p-3 rounded-xl border border-zinc-800/80 flex flex-col gap-3">
-                <div class="flex items-center justify-between">
-                    <span class="text-xs font-bold text-zinc-200">🤖 Tryb Auto-Bitwa (Demo)</span>
-                    <button id="auto-battle-btn" onclick="toggleAutoBattle()" class="px-3 py-1 rounded-lg text-xs font-bold bg-zinc-800 text-zinc-400 hover:bg-zinc-700 transition cursor-pointer">
-                        WYŁĄCZONY
-                    </button>
-                </div>
-                <div>
-                    <div class="flex justify-between text-[11px] text-zinc-400 mb-1">
-                        <span>Tempo prezentów (Auto):</span>
-                        <span id="speed-label" class="text-emerald-400 font-bold">Średnie</span>
-                    </div>
-                    <input id="auto-speed" type="range" min="1" max="5" value="3" oninput="updateAutoSpeed(this.value)" class="w-full accent-rose-500 cursor-pointer">
-                </div>
-            </div>
-
-            <!-- Sterowanie Rundą -->
-            <div class="flex gap-2">
-                <button onclick="resetRound()" class="flex-1 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold text-zinc-200 transition cursor-pointer">
-                    🔄 Resetuj Rundę
-                </button>
-                <button onclick="testConfetti()" class="px-3 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold text-amber-400 transition cursor-pointer" title="Test Konfetti 3D">
-                    🎉
-                </button>
-            </div>
+            <button onclick="resetRound()" class="w-full py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold text-zinc-200 cursor-pointer">🔄 Resetuj Rundę</button>
         </div>
 
-        <!-- ŚRODKOWY EKRAN: GRA 3D (FORMAT 9:16 POD TIKTOK LIVE STUDIO) -->
         <div id="tiktok-frame" class="rounded-3xl flex flex-col justify-between select-none">
-            <!-- Canvas Three.js -->
             <div id="canvas-container" class="absolute inset-0 w-full h-full z-0"></div>
-
-            <!-- NAKŁADKA HUD (GÓRA) -->
             <div class="relative z-10 p-4 flex flex-col gap-2 pointer-events-none">
-                <!-- Licznik Rund i Timer -->
                 <div class="flex items-center justify-between">
-                    <div class="px-3 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/15 text-xs font-bold tracking-wider">
-                        RUNDA <span id="round-number" class="text-amber-400">1</span>
-                    </div>
-                    <div class="px-4 py-1 rounded-full bg-black/70 backdrop-blur-md border border-white/20 font-gaming text-base font-black text-white shadow-lg">
-                        ⏱️ <span id="timer-display">01:00</span>
-                    </div>
-                    <div class="px-3 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/15 text-xs font-bold">
-                        WYGRANE: <span class="text-rose-400" id="rose-wins">0</span>:<span class="text-blue-400" id="galaxy-wins">0</span>
-                    </div>
+                    <div class="px-3 py-1 rounded-full bg-black/60 border border-white/15 text-xs font-bold">RUNDA <span id="round-number" class="text-amber-400">1</span></div>
+                    <div class="px-4 py-1 rounded-full bg-black/70 border border-white/20 font-gaming text-base font-black text-white">⏱️ <span id="timer-display">01:00</span></div>
+                    <div class="px-3 py-1 rounded-full bg-black/60 border border-white/15 text-xs font-bold">W: <span class="text-rose-400" id="rose-wins">0</span>:<span class="text-blue-400" id="galaxy-wins">0</span></div>
                 </div>
-
-                <!-- Pasek Przeciągania Liny (Tug of War Bar) -->
-                <div class="mt-1 bg-black/70 backdrop-blur-md p-2 rounded-2xl border border-white/15 shadow-xl">
+                <div class="mt-1 bg-black/70 p-2 rounded-2xl border border-white/15">
                     <div class="flex justify-between items-center text-xs font-black mb-1.5 px-1">
-                        <div class="flex items-center gap-1.5 text-rose-400">
-                            <span class="text-base">🌹</span>
-                            <span>RÓŻA: <span id="rose-score" class="text-white text-sm">0</span></span>
-                        </div>
-                        <span class="text-[10px] uppercase tracking-widest text-zinc-400">PRZECIĄGNIJ RDZEŃ</span>
-                        <div class="flex items-center gap-1.5 text-blue-400">
-                            <span>GALAKTYKA: <span id="galaxy-score" class="text-white text-sm">0</span></span>
-                            <span class="text-base">🌌</span>
-                        </div>
+                        <span class="text-rose-400">🌹 RÓŻA: <span id="rose-score" class="text-white">0</span></span>
+                        <span class="text-[10px] text-zinc-400 uppercase">PRZECIĄGNIJ RDZEŃ</span>
+                        <span class="text-blue-400">GALAKTYKA: <span id="galaxy-score" class="text-white">0</span> 🌌</span>
                     </div>
-                    <!-- Pasek dwukolorowy -->
                     <div class="w-full h-4 bg-zinc-900 rounded-full overflow-hidden flex relative border border-white/10">
-                        <div id="bar-rose" class="h-full bg-gradient-to-r from-rose-600 to-pink-500 tug-bar-glow-rose transition-all duration-300" style="width: 50%;"></div>
-                        <div id="bar-galaxy" class="h-full bg-gradient-to-l from-blue-600 to-indigo-500 tug-bar-glow-galaxy transition-all duration-300" style="width: 50%;"></div>
-                        <!-- Znacznik środka -->
+                        <div id="bar-rose" class="h-full bg-rose-600 transition-all duration-300" style="width: 50%;"></div>
+                        <div id="bar-galaxy" class="h-full bg-blue-600 transition-all duration-300" style="width: 50%;"></div>
                         <div class="absolute top-0 bottom-0 left-1/2 w-0.5 bg-white/80 -translate-x-1/2"></div>
                     </div>
                 </div>
-
-                <!-- Karta Drużyny Róża (Górny Totem) -->
-                <div class="self-center mt-1 px-4 py-1.5 rounded-2xl bg-rose-950/75 border border-rose-500/40 backdrop-blur-sm text-center">
-                    <div class="text-xs font-black text-rose-300 tracking-wide uppercase">🌹 Wyślij Różę / Serce / Lody</div>
-                </div>
             </div>
-
-            <!-- ŚRODKOWA STREFA POWIADOMIEŃ O PREZENTACH -->
-            <div id="gift-notifications" class="relative z-10 flex-1 flex flex-col items-center justify-center pointer-events-none px-4 overflow-hidden">
-                <!-- Tutaj dynamicznie wpadają powiadomienia o darczyńcach -->
-            </div>
-
-            <!-- NAKŁADKA HUD (DÓŁ) -->
+            <div id="gift-notifications" class="relative z-10 flex-1 flex flex-col items-center justify-center pointer-events-none px-4 overflow-hidden"></div>
             <div class="relative z-10 p-4 flex flex-col items-center gap-2 pointer-events-none">
-                <!-- Karta Drużyny Galaktyka (Dolny Totem) -->
-                <div class="px-4 py-1.5 rounded-2xl bg-blue-950/75 border border-blue-500/40 backdrop-blur-sm text-center">
-                    <div class="text-xs font-black text-blue-300 tracking-wide uppercase">🌌 Wyślij Corgi / Mikrofon / Universe</div>
-                </div>
-
-                <!-- Ostatni MVP / Największy Darczyńca -->
-                <div class="w-full px-3 py-2 rounded-2xl bg-black/65 backdrop-blur-md border border-white/10 flex items-center justify-between text-xs">
+                <div class="w-full px-3 py-2 rounded-2xl bg-black/65 border border-white/10 flex items-center justify-between text-xs">
                     <span class="text-zinc-400 font-semibold">👑 MVP Rundy:</span>
-                    <span id="mvp-display" class="font-bold text-amber-300 truncate max-w-[180px]">Czekam na prezenty...</span>
+                    <span id="mvp-display" class="font-bold text-amber-300">Czekam na prezenty...</span>
                 </div>
             </div>
-
-            <!-- EKRAN ZWYCIĘZCY (OVERLAY PO ZAKOŃCZENIU RUNDY) -->
-            <div id="winner-overlay" class="hidden absolute inset-0 z-30 bg-black/80 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center">
-                <div id="winner-icon" class="text-7xl mb-3 animate-bounce">🏆</div>
-                <div class="text-xs uppercase tracking-widest text-zinc-400 font-bold">KONIEC RUNDY</div>
-                <h2 id="winner-title" class="font-gaming text-3xl font-black mt-1 bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent">
-                    WYGRYWA RÓŻA!
-                </h2>
-                <p id="winner-mvp" class="text-sm text-zinc-300 mt-3 bg-white/10 px-4 py-2 rounded-xl border border-white/15">
-                    MVP: @Gracz123 (150 pkt)
-                </p>
-                <div class="mt-6 text-xs text-zinc-400">
-                    Następna runda wystartuje za <span id="next-round-countdown" class="text-white font-bold text-sm">5</span>s...
-                </div>
+            <div id="winner-overlay" class="hidden absolute inset-0 z-30 bg-black/80 flex flex-col items-center justify-center p-6 text-center">
+                <div id="winner-icon" class="text-7xl mb-3">🏆</div>
+                <h2 id="winner-title" class="font-gaming text-3xl font-black text-amber-400">WYGRYWA RÓŻA!</h2>
+                <p id="winner-mvp" class="text-sm text-zinc-300 mt-3">MVP: @Gracz</p>
             </div>
         </div>
 
-        <!-- PRAWY PANEL: Instrukcja TikFinity -->
-        <div class="side-panel w-full lg:w-80 bg-zinc-900/90 border border-zinc-800 rounded-2xl p-4 flex flex-col gap-3.5 shadow-xl text-xs">
-            <div class="border-b border-zinc-800 pb-2">
-                <h2 class="text-sm font-bold uppercase tracking-wider text-zinc-400">📡 Połączenie z TikFinity</h2>
+        <div class="side-panel w-full lg:w-80 bg-zinc-900/90 border border-zinc-800 rounded-2xl p-4 flex flex-col gap-3 text-xs">
+            <h2 class="text-sm font-bold uppercase text-zinc-400 border-b border-zinc-800 pb-2">📡 Status TikFinity</h2>
+            <div class="bg-zinc-950/70 p-3 rounded-xl border border-zinc-800 text-zinc-300 leading-relaxed">
+                <p class="font-bold text-emerald-400 mb-1">Jak podpiąć:</p>
+                1. Uruchom TikFinity na porcie <code class="text-amber-300">21213</code>.<br>
+                2. Klikaj przyciski po lewej, aby testować.
             </div>
-
-            <div class="space-y-2.5 text-zinc-300 leading-relaxed">
-                <div class="bg-zinc-950/70 p-2.5 rounded-xl border border-zinc-800">
-                    <span class="font-bold text-emerald-400 block mb-0.5">Port 21213</span>
-                    Uruchom TikFinity na komputerze. Gra automatycznie połączy się z Twoim programem.
-                </div>
-            </div>
-
-            <button onclick="connectWebSocket()" class="w-full py-2 rounded-xl bg-sky-600/20 hover:bg-sky-600/30 border border-sky-500/40 text-sky-300 font-semibold transition cursor-pointer">
-                🔌 Połącz ponownie
-            </button>
+            <button onclick="connectWebSocket()" class="w-full py-2 rounded-xl bg-sky-600/20 border border-sky-500/40 text-sky-300 font-semibold cursor-pointer">🔌 Połącz ponownie</button>
         </div>
     </div>
 
     <script>
-        /**
-         * ============================================================================
-         * 1. STAN GRY I KONFIGURACJA
-         * ============================================================================
-         */
-        const GAME_CONFIG = {
-            roundDuration: 60,
-            winThreshold: 100,
-            trackLength: 7.0,
-            autoRestartDelay: 5
-        };
+        const GAME_CONFIG = { winThreshold: 100, trackLength: 7.0 };
+        let state = { round: 1, roseScore: 0, galaxyScore: 0, roseWins: 0, galaxyWins: 0, isRoundOver: false, donors: {}, targetCoreZ: 0, currentCoreZ: 0, cameraShake: 0 };
+        const FAKE_USERS = ["Kasia_PL", "MatiGaming", "Ola_Warszawa", "Szefu99", "ZuziaX"];
 
-        let state = {
-            round: 1,
-            timeLeft: GAME_CONFIG.roundDuration,
-            roseScore: 0,
-            galaxyScore: 0,
-            roseWins: 0,
-            galaxyWins: 0,
-            isRoundOver: false,
-            autoBattle: false,
-            autoIntervalMs: 1200,
-            donors: {},
-            targetCoreZ: 0,
-            currentCoreZ: 0,
-            cameraShake: 0
-        };
-
-        const FAKE_USERS = [
-            "Kasia_PL", "MatiGaming", "Ola_Warszawa", "Szefu99", "ZuziaX",
-            "Kamil_Live", "NocnyMarek", "Ania_2004", "Bartek_PRO", "KrólowaTikToka"
-        ];
-
-        /**
-         * ============================================================================
-         * 2. INICJALIZACJA SCENY 3D (THREE.JS)
-         * ============================================================================
-         */
         const container = document.getElementById('canvas-container');
         const scene = new THREE.Scene();
         scene.fog = new THREE.FogExp2(0x090912, 0.035);
 
-        const camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 0.1, 100);
-        const baseCameraPos = new THREE.Vector3(0, 11.5, 13.5);
-        camera.position.copy(baseCameraPos);
+        const w = container.clientWidth || 400;
+        const h = container.clientHeight || 600;
+
+        const camera = new THREE.PerspectiveCamera(50, w / h, 0.1, 100);
+        camera.position.set(0, 11.5, 13.5);
         camera.lookAt(0, 0.5, 0);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-        renderer.setSize(container.clientWidth, container.clientHeight);
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-        renderer.shadowMap.enabled = true;
+        renderer.setSize(w, h);
         container.appendChild(renderer.domElement);
 
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-        scene.add(ambientLight);
-
+        scene.add(new THREE.AmbientLight(0xffffff, 0.5));
         const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
         dirLight.position.set(6, 15, 8);
-        dirLight.castShadow = true;
         scene.add(dirLight);
 
-        const roseLight = new THREE.PointLight(0xf43f5e, 2.5, 18);
-        roseLight.position.set(0, 3, -GAME_CONFIG.trackLength);
-        scene.add(roseLight);
-
-        const galaxyLight = new THREE.PointLight(0x3b82f6, 2.5, 18);
-        galaxyLight.position.set(0, 3, GAME_CONFIG.trackLength);
-        scene.add(galaxyLight);
-
-        const floorGeo = new THREE.PlaneGeometry(16, 24);
-        const floorMat = new THREE.MeshStandardMaterial({
-            color: 0x11111b,
-            roughness: 0.4,
-            metalness: 0.6
-        });
-        const floor = new THREE.Mesh(floorGeo, floorMat);
-        floor.rotation.x = -Math.PI / 2;
-        floor.receiveShadow = true;
-        scene.add(floor);
-
-        const gridHelper = new THREE.GridHelper(22, 22, 0x3f3f46, 0x1e1e2e);
-        gridHelper.position.y = 0.01;
-        scene.add(gridHelper);
-
-        const centerLineGeo = new THREE.BoxGeometry(10, 0.05, 0.15);
-        const centerLineMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-        const centerLine = new THREE.Mesh(centerLineGeo, centerLineMat);
-        centerLine.position.y = 0.03;
-        scene.add(centerLine);
-
-        const trackGeo = new THREE.BoxGeometry(0.4, 0.08, GAME_CONFIG.trackLength * 2);
-        const trackMat = new THREE.MeshStandardMaterial({
-            color: 0x27272a,
-            emissive: 0x18181b,
-            metalness: 0.8
-        });
-        const track = new THREE.Mesh(trackGeo, trackMat);
-        track.position.y = 0.04;
-        scene.add(track);
-
-        function createTeamTotem(colorHex, zPos) {
-            const group = new THREE.Group();
-            group.position.set(0, 0, zPos);
-
-            const baseGeo = new THREE.CylinderGeometry(1.6, 2.0, 0.6, 16);
-            const baseMat = new THREE.MeshStandardMaterial({ color: 0x1f1f2e, metalness: 0.7, roughness: 0.3 });
-            const base = new THREE.Mesh(baseGeo, baseMat);
-            base.position.y = 0.3;
-            group.add(base);
-
-            const crystalGeo = new THREE.OctahedronGeometry(1.1, 0);
-            const crystalMat = new THREE.MeshStandardMaterial({
-                color: colorHex,
-                emissive: colorHex,
-                emissiveIntensity: 0.6,
-                roughness: 0.2,
-                metalness: 0.5
-            });
-            const crystal = new THREE.Mesh(crystalGeo, crystalMat);
-            crystal.position.y = 2.0;
-            group.add(crystal);
-
-            const ringGeo = new THREE.TorusGeometry(1.5, 0.08, 12, 32);
-            const ringMat = new THREE.MeshBasicMaterial({ color: colorHex });
-            const ring = new THREE.Mesh(ringGeo, ringMat);
-            ring.position.y = 2.0;
-            ring.rotation.x = Math.PI / 2;
-            group.add(ring);
-
-            scene.add(group);
-            return { group, crystal, ring };
-        }
-
-        const roseTotem = createTeamTotem(0xf43f5e, -GAME_CONFIG.trackLength);
-        const galaxyTotem = createTeamTotem(0x3b82f6, GAME_CONFIG.trackLength);
-
+        scene.add(Object.assign(new THREE.Mesh(new THREE.PlaneGeometry(16, 24), new THREE.MeshStandardMaterial({ color: 0x11111b })), { rotation: { x: -Math.PI / 2 } }));
+        
         const coreGroup = new THREE.Group();
         coreGroup.position.set(0, 1.5, 0);
-
-        const coreGeo = new THREE.IcosahedronGeometry(1.15, 1);
-        const coreMat = new THREE.MeshStandardMaterial({
-            color: 0xffffff,
-            emissive: 0xa855f7,
-            emissiveIntensity: 0.8,
-            roughness: 0.1,
-            metalness: 0.9
-        });
-        const coreMesh = new THREE.Mesh(coreGeo, coreMat);
-        coreGroup.add(coreMesh);
-
-        const cageGeo = new THREE.IcosahedronGeometry(1.45, 0);
-        const cageMat = new THREE.MeshBasicMaterial({ color: 0xfef08a, wireframe: true });
-        const cageMesh = new THREE.Mesh(cageGeo, cageMat);
-        coreGroup.add(cageMesh);
-
-        const coreLight = new THREE.PointLight(0xd8b4fe, 3, 12);
-        coreGroup.add(coreLight);
+        coreGroup.add(new THREE.Mesh(new THREE.IcosahedronGeometry(1.15, 1), new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xa855f7, emissiveIntensity: 0.8 })));
         scene.add(coreGroup);
 
-        function createBeam(colorHex) {
-            const geo = new THREE.CylinderGeometry(0.14, 0.14, 1, 12);
-            geo.rotateX(Math.PI / 2);
-            const mat = new THREE.MeshBasicMaterial({ color: colorHex, transparent: true, opacity: 0.85 });
-            const mesh = new THREE.Mesh(geo, mat);
-            scene.add(mesh);
-            return mesh;
-        }
-
-        const roseBeam = createBeam(0xf43f5e);
-        const galaxyBeam = createBeam(0x3b82f6);
-
         const particles = [];
-
-        function spawnBurst3D(colorHex, zPos, count = 25, isConfetti = false) {
-            const geo = isConfetti ? new THREE.PlaneGeometry(0.25, 0.15) : new THREE.BoxGeometry(0.22, 0.22, 0.22);
-
+        function spawnBurst3D(colorHex, zPos, count = 25) {
             for (let i = 0; i < count; i++) {
-                const mat = new THREE.MeshBasicMaterial({
-                    color: isConfetti ? Math.random() * 0xffffff : colorHex,
-                    side: THREE.DoubleSide
-                });
-                const mesh = new THREE.Mesh(geo, mat);
-
-                mesh.position.set(
-                    (Math.random() - 0.5) * (isConfetti ? 8 : 1.5),
-                    isConfetti ? 8 + Math.random() * 5 : 1.5 + Math.random(),
-                    zPos + (Math.random() - 0.5) * (isConfetti ? 12 : 1.5)
-                );
-
-                const velocity = new THREE.Vector3(
-                    (Math.random() - 0.5) * (isConfetti ? 0.15 : 0.35),
-                    isConfetti ? -0.08 - Math.random() * 0.1 : 0.15 + Math.random() * 0.25,
-                    (Math.random() - 0.5) * (isConfetti ? 0.15 : 0.35)
-                );
-
+                const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.22), new THREE.MeshBasicMaterial({ color: colorHex }));
+                mesh.position.set((Math.random() - 0.5) * 1.5, 1.5 + Math.random(), zPos + (Math.random() - 0.5) * 1.5);
                 scene.add(mesh);
-                particles.push({ mesh, velocity, life: isConfetti ? 180 : 55, isConfetti });
+                particles.push({ mesh, velocity: new THREE.Vector3((Math.random() - 0.5) * 0.35, 0.15 + Math.random() * 0.25, (Math.random() - 0.5) * 0.35), life: 55 });
             }
         }
 
-        /**
-         * ============================================================================
-         * 3. LOGIKA ROZGRYWKI I OBSŁUGA PREZENTÓW
-         * ============================================================================
-         */
         function triggerGift(team, giftName, icon, points, customUser = null) {
             if (state.isRoundOver) return;
-
             const user = customUser || FAKE_USERS[Math.floor(Math.random() * FAKE_USERS.length)];
-
-            if (team === 'rose') {
-                state.roseScore += points;
-            } else {
-                state.galaxyScore += points;
-            }
-
+            if (team === 'rose') state.roseScore += points; else state.galaxyScore += points;
             state.donors[user] = (state.donors[user] || 0) + points;
-            updateMVP();
-
+            
             const diff = state.galaxyScore - state.roseScore;
-            const normalized = Math.max(-1, Math.min(1, diff / GAME_CONFIG.winThreshold));
-            state.targetCoreZ = normalized * (GAME_CONFIG.trackLength - 1.4);
-
-            state.cameraShake = Math.min(0.6, 0.12 + points * 0.012);
-            const burstColor = team === 'rose' ? 0xf43f5e : 0x3b82f6;
-            const burstCount = Math.min(60, 12 + points * 2);
-            spawnBurst3D(burstColor, state.currentCoreZ, burstCount, false);
-
-            coreGroup.scale.set(1.35, 1.35, 1.35);
-
-            showGiftToast(user, giftName, icon, points, team);
+            state.targetCoreZ = Math.max(-1, Math.min(1, diff / GAME_CONFIG.winThreshold)) * (GAME_CONFIG.trackLength - 1.4);
+            
+            spawnBurst3D(team === 'rose' ? 0xf43f5e : 0x3b82f6, state.currentCoreZ, 20);
             updateHUD();
-
-            if (Math.abs(diff) >= GAME_CONFIG.winThreshold) {
-                endRound(diff < 0 ? 'rose' : 'galaxy');
-            }
-        }
-
-        function showGiftToast(user, giftName, icon, points, team) {
-            const container = document.getElementById('gift-notifications');
-            const toast = document.createElement('div');
-
-            const borderColor = team === 'rose' ? 'border-rose-500/70 bg-rose-950/85' : 'border-blue-500/70 bg-blue-950/85';
-            const badgeColor = team === 'rose' ? 'text-rose-300' : 'text-blue-300';
-
-            toast.className = `gift-toast mb-2 px-4 py-2 rounded-2xl border ${borderColor} backdrop-blur-md shadow-xl flex items-center gap-3 max-w-[90%]`;
-            toast.innerHTML = `
-                <span class="text-3xl">${icon}</span>
-                <div class="text-left leading-tight">
-                    <div class="text-xs font-black text-white">@${user}</div>
-                    <div class="text-[11px] ${badgeColor} font-semibold">wysłał(a) ${giftName} <span class="text-amber-300 font-bold">(+${points} pkt)</span></div>
-                </div>
-            `;
-
-            container.appendChild(toast);
-            if (container.children.length > 3) {
-                container.removeChild(container.firstChild);
-            }
-
-            setTimeout(() => {
-                if (toast.parentNode === container) {
-                    container.removeChild(toast);
-                }
-            }, 2400);
-        }
-
-        function updateMVP() {
-            let topUser = null;
-            let topPoints = 0;
-            for (const [user, pts] of Object.entries(state.donors)) {
-                if (pts > topPoints) {
-                    topPoints = pts;
-                    topUser = user;
-                }
-            }
-            const mvpEl = document.getElementById('mvp-display');
-            if (topUser) {
-                mvpEl.textContent = `@${topUser} (${topPoints} pkt)`;
-            } else {
-                mvpEl.textContent = "Czekam na prezenty...";
-            }
         }
 
         function updateHUD() {
             document.getElementById('rose-score').textContent = state.roseScore;
             document.getElementById('galaxy-score').textContent = state.galaxyScore;
-            document.getElementById('rose-wins').textContent = state.roseWins;
-            document.getElementById('galaxy-wins').textContent = state.galaxyWins;
-            document.getElementById('round-number').textContent = state.round;
-
             const total = state.roseScore + state.galaxyScore;
-            let rosePercent = 50;
-            let galaxyPercent = 50;
-
-            if (total > 0) {
-                rosePercent = (state.roseScore / total) * 100;
-                galaxyPercent = (state.galaxyScore / total) * 100;
-            }
-
-            document.getElementById('bar-rose').style.width = `${rosePercent}%`;
-            document.getElementById('bar-galaxy').style.width = `${galaxyPercent}%`;
+            let roseP = total > 0 ? (state.roseScore / total) * 100 : 50;
+            document.getElementById('bar-rose').style.width = `${roseP}%`;
+            document.getElementById('bar-galaxy').style.width = `${100 - roseP}%`;
         }
 
-        function endRound(winningTeam) {
-            if (state.isRoundOver) return;
-            state.isRoundOver = true;
+        function resetRound() {
+            state.roseScore = 0; state.galaxyScore = 0; state.isRoundOver = false; state.targetCoreZ = 0; state.currentCoreZ = 0;
+            updateHUD();
+        }
 
-            if (winningTeam === 'rose') {
-                state.roseWins++;
-                document.getElementById('winner-title').textContent = "WYGRYWA DRUŻYNA RÓŻA! 🌹";
-                document.getElementById('winner-icon').textContent = "🌹";
-                spawnBurst3D(0xf43f5e, 0, 120, true);
-            } else {
-                state.galaxyWins++;
-                document.getElementById('winner-title').textContent = "WYGRYWA DRUŻYNA GALAKTYKA! 🌌";
-                document.getElementById('winner-icon').textContent = "🌌";
-                spawnBurst3D(0x3b82f6, 0, 120, true);
+        let socket = null;
+        function connectWebSocket() {
+            if (socket) socket.close();
+            try {
+                socket = new WebSocket('ws://localhost:21213/');
+                socket.onopen = () => {
+                    document.getElementById('ws-dot').className = "w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse";
+                    document.getElementById('ws-status-text').textContent = "Połączono z TikFinity!";
+                };
+                socket.onmessage = (event) => {
+                    const message = JSON.parse(event.data);
+                    if (message.event === "gift" && message.data) {
+                        const data = message.data;
+                        const giftName = data.giftName || data.name || "Prezent";
+                        const team = giftName.toLowerCase().includes("corgi") || giftName.toLowerCase().includes("mic") ? 'galaxy' : 'rose';
+                        triggerGift(team, giftName, "🎁", (data.diamondCount || 1) * (data.repeatCount || 1), data.uniqueId);
+                    }
+                };
+                socket.onclose = () => {
+                    document.getElementById('ws-dot').className = "w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse";
+                    document.getElementById('ws-status-text').textContent = "Rozłączono - ponawiam...";
+                    setTimeout(connectWebSocket, 3000);
+                };
+            } catch (e) {}
+        }
+        window.addEventListener('load', connectWebSocket);
+
+        let streamerMode = false;
+        function toggleStreamerMode() {
+            streamerMode = !streamerMode;
+            document.body.classList.toggle('streamer-mode', streamerMode);
+            document.getElementById('streamer-btn-text').textContent = streamerMode ? "Wyjdź z trybu" : "Tryb Streamera";
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            state.currentCoreZ += (state.targetCoreZ - state.currentCoreZ) * 0.08;
+            coreGroup.position.z = state.currentCoreZ;
+            
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.mesh.position.add(p.velocity);
+                p.life--;
+                if (p.life <= 0) { scene.remove(p.mesh); particles.splice(i, 1); }
             }
-
-            let topUser = "Brak";
-            let
+            renderer.render(scene, camera);
+        }
+        animate();
+    </script>
+</body>
+</html>
